@@ -1,0 +1,254 @@
+Выход (после установки пароля) - end
+
+когда мы в режиме (<IP>) config, то перед запуском show running-config надо выйти (через end)
+
+(пользовательский режим)
+configure terminal - переход в режим конфигурации
+end - завершает режим конфигурации
+
+(привелигированный)
+
+Выходим из привелигированного режима (когда приглашение вида <IP>#) через logout
+
+Заходим обратно через enable
+Просит пароль - вводим секрет
+
+///
+
+Из (configure) режима можно выйти через Ctrl + Z, Enter
+
+///
+
+
+enable
+configure terminal
+hostname 192.168.12.0 (?)
+enable password iu3
+enable secret cisco
+line vty 0 15
+password vty
+login
+service password-encryption
+
+
+
+(1)
+
+configure terminal запускается только из превилегированного режима (или это режим глобальной конфигурации) [тот, что с #]
+
+
+сначала ввели iu3, потом cisco
+
+
+ПРИ КОНФИГУРАЦИИ VLAN
+
+после назначения IP и маски необходимо вписать
+(config-if)# no shut
+
+
+Когда подключаемся с PC через Telnet, то необходимо ввести пароль от VTY (vty)
+
+
+
+
+Группа 2
+
+Количество интерфейсов роутеров
+
+Зарезервировано
+XXXXXXXX 	XXXXXXXX	XXXXXXXX	XX 			000000
+XXXXXXXX 	XXXXXXXX	XXXXXXXX	XX 			111111
+
+Первый интерфейс - 
+
+192			168			12 			Подсеть		Номер
+00000000	00000000	00000000	00 			000001
+									(1)
+
+Второй интерфейс - 
+
+192			168			12 			Подсеть		Номер
+00000000	00000000	00000000	01 			000001
+									(65)
+
+Третий интерфейс - 
+
+192			168			12 			Подсеть		Номер
+00000000	00000000	00000000	10 			000001
+									(129)
+
+11 000 000
+
+
+
+
+Без default gateway у ПК (должен быть одним из IP адресов, которые назначали роутеру) пакет сразу умирает (почему???)
+
+
+
+
+
+
+
+
+Требования
+
+vlan 7, 10
+
+
+Настройка свича (0) с нуля
+
+enable 
+conf t
+hostname 192.168.12.0
+enable password iu3
+enable secret cisco
+line vty 0 15
+password vty
+login
+line console 0
+password console
+login
+exit
+service password-encryption
+
+= Настраиваем vlan 7
+
+interface vlan 7
+'''
+Интерфейс для vlan7 на первом свиче
+
+192			168			12 			Подсеть		Номер
+00000000	00000000	00000000	01 			000001
+									(65)
+'''
+ip address 192.168.12.65 255.255.255.192
+
+= Настраиваем vlan 10
+interface vlan 10
+'''
+Интерфейс для vlan7 на первом свиче
+
+192			168			12 			Подсеть		Номер
+00000000	00000000	00000000	10 			000001
+									(129)
+'''
+ip address 192.168.12.129 255.255.255.192
+
+
+// У PC0 должна быть 10 подсеть => IP: 192.168.12.130 (129 у свича)
+// У PC1 должна быть 00 подсеть (без vlan) => IP: 192.168.12.1
+// У PC2 должна быть 01 подсеть => IP: 192.168.12.66 (65 уже у свича)
+// У PC3 должна быть 10 подсеть => IP: 192.168.12.66 (65 уже у свича)
+
+
+
+= Настройка роутера с нуля
+enable
+conf t
+int fa 0/0
+no shutdown
+
+int fa 0/0.7
+encapsulation dot1Q 7
+ip address 192.168.12.65 255.255.255.192 (1 подсеть, №1)
+no shutdown
+exit
+
+int fa 0/0.10
+encapsulation dot1Q 10
+ip address 192.168.12.129 255.255.255.192 (2 подсеть, №1)
+no shutdown
+exit
+
+do wr mem
+
+'''
+подинтерфейс с нуля
+int fa 0/0.<номер vlan>
+encapsulation dot1Q <номер vlan>
+ip add <ip> <mask>
+no shutdown
+'''
+
+
+
+= Настройка свича (2)
+
+enable 
+conf t
+hostname 192.168.12.0
+vlan 7
+name VLAN7
+exit
+vlan 10
+name VLAN10
+exit
+
+int fa 0/3
+switchport mode trunk
+switchport trunk allowed vlan 1,7,10
+end
+wr mem
+
+= Настройка свича (0)
+
+
+0/0 (для vlan 1) - 0 
+0/0.7 		     - 1
+0/0.10           - 2
+
+
+
+
+Чтобы роутер не сбросил приходящий ARP пакет, необходимо,
+чтобы IP адрес отправителя ARP пакета был в той же сети, 
+что и порт, на который приходит пакет.
+
+
+
+
+Telnet 
+
+Router>en
+Router#config term
+Router(config)#enable password admin
+
+Router(config)#line vty 0 15
+Router(config-line)#password vty
+Router(config-line)#login
+
+int fa 0/0 ip:
+192.168.12.9
+
+
+
+где в хедере номер влан?
+последние 12 бит TCI
+
+табличка маппинга MAC-адресов и портов:
+show mac-address-table
+
+
+
+Свич помещает тег (соответствующий сконфигурированному VLAN ID), 
+когда фрейм приходит на (untagged = access) порт.
+
+
+
+как сбросить тег?
+конфиг и настройка устройства, отв за сброс тега
+switchport trunk native vlan <vlan-id>
+
+- неправильно
+
+Чтобы пакет через switch пролетал без тега по соединению, 
+надо заменить транковое на switchport access vlan 1
+
+(непральна) VLAN уничтожается роутером (xxx)
+
+
+
+Default gateway нужен для отправки пакетов в другую подсеть.
+
+
